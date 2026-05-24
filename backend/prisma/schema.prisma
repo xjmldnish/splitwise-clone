@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  groups        GroupMember[]
+  paidExpenses  Expense[]
+  splits        ExpenseSplit[]
+  settlements   Settlement[]  @relation("SettlementPayer")
+  received      Settlement[]  @relation("SettlementReceiver")
+}
+
+model Group {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+
+  members   GroupMember[]
+  expenses  Expense[]
+}
+
+model GroupMember {
+  groupId Int
+  userId  Int
+  group   Group @relation(fields: [groupId], references: [id])
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@id([groupId, userId])
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  description String
+  amount      Float
+  paidById    Int
+  groupId     Int
+  createdAt   DateTime @default(now())
+
+  paidBy  User           @relation(fields: [paidById], references: [id])
+  group   Group          @relation(fields: [groupId], references: [id])
+  splits  ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id         Int     @id @default(autoincrement())
+  expenseId  Int
+  userId     Int
+  amountOwed Float
+
+  expense Expense @relation(fields: [expenseId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model Settlement {
+  id         Int      @id @default(autoincrement())
+  payerId    Int
+  receiverId Int
+  amount     Float
+  groupId    Int
+  createdAt  DateTime @default(now())
+
+  payer    User @relation("SettlementPayer", fields: [payerId], references: [id])
+  receiver User @relation("SettlementReceiver", fields: [receiverId], references: [id])
+}
