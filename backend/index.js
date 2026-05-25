@@ -16,7 +16,16 @@ app.use('/groups', groupRoutes)
 app.use('/expenses', expenseRoutes)
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Splitwise API is running! 🚀' })
+  res.json({ message: 'Splitwise API is running' })
+})
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' })
+})
+
+app.use((err, req, res, next) => {
+  console.error(err)
+  res.status(500).json({ error: 'Something went wrong' })
 })
 
 const PORT = process.env.PORT || 5000

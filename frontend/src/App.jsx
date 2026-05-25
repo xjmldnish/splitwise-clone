@@ -7,21 +7,23 @@ import GroupDetail from './pages/GroupDetail'
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth()
-  return user ? children : <Navigate to="/login" />
+  return user ? children : <Navigate to="/login" replace />
+}
+
+const PublicOnlyRoute = ({ children }) => {
+  const { user } = useAuth()
+  return user ? <Navigate to="/dashboard" replace /> : children
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/dashboard" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
-      <Route path="/groups/:id" element={
-        <ProtectedRoute><GroupDetail /></ProtectedRoute>
-      } />
-      <Route path="*" element={<Navigate to="/login" />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/groups/:id" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
 }

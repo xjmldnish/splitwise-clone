@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
@@ -8,167 +8,129 @@ export default function Dashboard() {
   const [newGroupName, setNewGroupName] = useState('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    fetchGroups()
-  }, [])
+  const handleLogout = useCallback(() => {
+    logout()
+    navigate('/login')
+  }, [logout, navigate])
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) setLoading(true)
+
     try {
       const res = await api.get('/groups')
       setGroups(res.data)
+      setError('')
     } catch (err) {
-      console.error(err)
+      if (err.response?.status === 401) {
+        handleLogout()
+        return
+      }
+      setError(err.response?.data?.error || 'Unable to load your groups')
     } finally {
       setLoading(false)
     }
-  }
+  }, [handleLogout])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchGroups()
+  }, [fetchGroups])
 
   const createGroup = async (e) => {
     e.preventDefault()
-    if (!newGroupName.trim()) return
+    const name = newGroupName.trim()
+    if (!name) return
+
     setCreating(true)
+    setError('')
+
     try {
-      await api.post('/groups', { name: newGroupName })
+      const res = await api.post('/groups', { name })
+      setGroups(current => [res.data, ...current])
       setNewGroupName('')
-      fetchGroups()
     } catch (err) {
-      console.error(err)
+      setError(err.response?.data?.error || 'Unable to create this group')
     } finally {
       setCreating(false)
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
-
   return (
-    <div style={styles.container}>
-      {/* Navbar */}
-      <div style={styles.navbar}>
-        <h1 style={styles.logo}>💰 Splitwise</h1>
-        <div style={styles.navRight}>
-          <span style={styles.welcome}>Hi, {user?.name}!</span>
-          <button style={styles.logoutBtn} onClick={handleLogout}>Logout</button>
+    <main className="app-shell">
+      <header className="topbar">
+        <div>
+          <p className="brand-mark">Splitwise</p>
+          <h1>Groups</h1>
         </div>
-      </div>
+        <div className="topbar-actions">
+          <span className="welcome-text">Hi, {user?.name}</span>
+          <button className="button button-secondary" onClick={handleLogout}>Log out</button>
+        </div>
+      </header>
 
-      <div style={styles.content}>
-        {/* Create Group */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Create a New Group</h2>
-          <form onSubmit={createGroup} style={styles.form}>
-            <input
-              style={styles.input}
-              type="text"
-              placeholder="e.g. Trip to Langkawi"
-              value={newGroupName}
-              onChange={e => setNewGroupName(e.target.value)}
-              required
-            />
-            <button style={styles.button} disabled={creating}>
-              {creating ? 'Creating...' : '+ Create Group'}
+      <section className="content-grid dashboard-grid">
+        <div className="panel" aria-labelledby="create-group-title">
+          <h2 id="create-group-title">Create a Group</h2>
+          <p className="muted">Use a clear name so members recognize what the expenses are for.</p>
+
+          {error && <p className="alert alert-error" role="alert">{error}</p>}
+
+          <form onSubmit={createGroup} className="inline-form">
+            <div className="field">
+              <label htmlFor="group-name">Group name</label>
+              <input
+                id="group-name"
+                type="text"
+                placeholder="Trip to Langkawi"
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                required
+              />
+            </div>
+            <button className="button button-primary" disabled={creating || !newGroupName.trim()}>
+              {creating ? 'Creating...' : 'Create'}
             </button>
           </form>
         </div>
 
-        {/* Groups List */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Your Groups</h2>
+        <div className="panel" aria-labelledby="groups-title">
+          <div className="section-heading">
+            <div>
+              <h2 id="groups-title">Your Groups</h2>
+              <p className="muted">{groups.length} active group{groups.length === 1 ? '' : 's'}</p>
+            </div>
+          </div>
+
           {loading ? (
-            <p style={styles.muted}>Loading...</p>
+            <p className="empty-state" aria-live="polite">Loading groups...</p>
           ) : groups.length === 0 ? (
-            <p style={styles.muted}>No groups yet. Create one above!</p>
+            <p className="empty-state">No groups yet. Create one to start tracking shared expenses.</p>
           ) : (
-            groups.map(group => (
-              <div
-                key={group.id}
-                style={styles.groupCard}
-                onClick={() => navigate(`/groups/${group.id}`)}
-              >
-                <div style={styles.groupIcon}>👥</div>
-                <div>
-                  <div style={styles.groupName}>{group.name}</div>
-                  <div style={styles.groupMeta}>
-                    {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
-                <div style={styles.arrow}>→</div>
-              </div>
-            ))
+            <div className="list" aria-label="Groups">
+              {groups.map(group => (
+                <button
+                  key={group.id}
+                  className="list-row group-row"
+                  onClick={() => navigate(`/groups/${group.id}`)}
+                >
+                  <span className="avatar" aria-hidden="true">{group.name.slice(0, 1).toUpperCase()}</span>
+                  <span>
+                    <span className="row-title">{group.name}</span>
+                    <span className="row-meta">
+                      {group.members.length} member{group.members.length === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                  <span className="row-action" aria-hidden="true">Open</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
-}
-
-const styles = {
-  container: { minHeight: '100vh', background: '#f5f5f5' },
-  navbar: {
-    background: 'white',
-    padding: '16px 24px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-  },
-  logo: { color: '#1cc29f', fontSize: '22px' },
-  navRight: { display: 'flex', alignItems: 'center', gap: '16px' },
-  welcome: { color: '#666', fontSize: '14px' },
-  logoutBtn: {
-    padding: '8px 16px',
-    background: 'transparent',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px',
-    color: '#666'
-  },
-  content: { maxWidth: '600px', margin: '32px auto', padding: '0 16px' },
-  card: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-  },
-  cardTitle: { fontSize: '18px', marginBottom: '16px', color: '#333' },
-  form: { display: 'flex', gap: '10px' },
-  input: {
-    flex: 1,
-    padding: '10px 14px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px'
-  },
-  button: {
-    padding: '10px 18px',
-    background: '#1cc29f',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    whiteSpace: 'nowrap'
-  },
-  groupCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '14px',
-    borderRadius: '8px',
-    border: '1px solid #eee',
-    marginBottom: '10px',
-    cursor: 'pointer',
-    transition: 'background 0.2s'
-  },
-  groupIcon: { fontSize: '24px' },
-  groupName: { fontWeight: '600', fontSize: '15px' },
-  groupMeta: { fontSize: '13px', color: '#888', marginTop: '2px' },
-  arrow: { marginLeft: 'auto', color: '#bbb', fontSize: '18px' },
-  muted: { color: '#888', fontSize: '14px' }
 }

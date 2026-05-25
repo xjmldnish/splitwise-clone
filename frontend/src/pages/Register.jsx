@@ -14,120 +14,74 @@ export default function Register() {
     e.preventDefault()
     setLoading(true)
     setError('')
+
     try {
       await api.post('/auth/register', { name, email, password })
       navigate('/login')
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong')
+      setError(err.response?.data?.error || 'Unable to create your account right now')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>💰 Splitwise</h1>
-        <h2 style={styles.subtitle}>Create an account</h2>
-        {error && <p style={styles.error}>{error}</p>}
-        <form onSubmit={handleSubmit}>
-          <input
-            style={styles.input}
-            type="text"
-            placeholder="Full Name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-          />
-          <input
-            style={styles.input}
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <input
-            style={styles.input}
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-          <button style={styles.button} disabled={loading}>
-            {loading ? 'Creating account...' : 'Register'}
+    <main className="auth-shell">
+      <section className="auth-card" aria-labelledby="register-title">
+        <p className="brand-mark">Splitwise</p>
+        <h1 id="register-title">Create an account</h1>
+        <p className="auth-copy">Start a group, add friends, and keep balances clear.</p>
+
+        {error && <p className="alert alert-error" role="alert">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="stack">
+          <div className="field">
+            <label htmlFor="name">Full name</label>
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              minLength="8"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+            <span className="field-hint">Use at least 8 characters.</span>
+          </div>
+
+          <button className="button button-primary" disabled={loading}>
+            {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
-        <p style={styles.link}>
-          Already have an account? <Link to="/login">Log In</Link>
-        </p>
-      </div>
-    </div>
-  )
-}
 
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: '#f5f5f5'
-  },
-  card: {
-    background: 'white',
-    padding: '40px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 20px rgba(0,0,0,0.1)',
-    width: '100%',
-    maxWidth: '400px'
-  },
-  title: {
-    textAlign: 'center',
-    fontSize: '28px',
-    marginBottom: '8px',
-    color: '#1cc29f'
-  },
-  subtitle: {
-    textAlign: 'center',
-    fontSize: '18px',
-    marginBottom: '24px',
-    color: '#666',
-    fontWeight: 'normal'
-  },
-  input: {
-    width: '100%',
-    padding: '12px 16px',
-    marginBottom: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '15px',
-    display: 'block'
-  },
-  button: {
-    width: '100%',
-    padding: '12px',
-    background: '#1cc29f',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    marginTop: '8px'
-  },
-  error: {
-    color: '#e74c3c',
-    background: '#fdf0ed',
-    padding: '10px',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    fontSize: '14px'
-  },
-  link: {
-    textAlign: 'center',
-    marginTop: '20px',
-    color: '#666',
-    fontSize: '14px'
-  }
+        <p className="auth-switch">
+          Already registered? <Link to="/login">Log in</Link>
+        </p>
+      </section>
+    </main>
+  )
 }

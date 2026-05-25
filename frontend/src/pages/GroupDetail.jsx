@@ -1,7 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-MY', {
+    style: 'currency',
+    currency: 'MYR'
+  }).format(Number(value) || 0)
+}
 
 export default function GroupDetail() {
   const { id } = useParams()
@@ -20,46 +27,73 @@ export default function GroupDetail() {
   const [adding, setAdding] = useState(false)
   const [addingMember, setAddingMember] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
-  useEffect(() => {
-    fetchAll()
-  }, [id])
+  const fetchAll = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) setLoading(true)
 
-  const fetchAll = async () => {
     try {
       const [groupRes, expenseRes, balanceRes] = await Promise.all([
         api.get('/groups'),
         api.get(`/expenses/${id}`),
         api.get(`/expenses/${id}/balances`)
       ])
-      const found = groupRes.data.find(g => g.id === parseInt(id))
+      const found = groupRes.data.find(g => g.id === Number(id))
+
+      if (!found) {
+        setError('Group not found or you no longer have access')
+        setGroup(null)
+        setMembers([])
+        return
+      }
+
       setGroup(found)
-      setMembers(found?.members.map(m => m.user) || [])
+      setMembers(found.members.map(member => member.user))
       setExpenses(expenseRes.data)
       setBalances(balanceRes.data)
+      setError('')
     } catch (err) {
-      console.error(err)
+      setError(err.response?.data?.error || 'Unable to load this group')
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAll()
+  }, [fetchAll])
+
+  const totalSpent = useMemo(() => {
+    return expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+  }, [expenses])
 
   const addExpense = async (e) => {
     e.preventDefault()
+    const cleanDescription = description.trim()
+    const numericAmount = Number(amount)
+
+    if (!cleanDescription || !Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setError('Enter an expense description and an amount greater than 0')
+      return
+    }
+
     setAdding(true)
     setError('')
+    setNotice('')
+
     try {
-      const splitWith = members.map(m => m.id)
       await api.post(`/expenses/${id}`, {
-        description,
-        amount: parseFloat(amount),
-        splitWith
+        description: cleanDescription,
+        amount: numericAmount,
+        splitWith: members.map(member => member.id)
       })
       setDescription('')
       setAmount('')
-      fetchAll()
+      setNotice('Expense added')
+      await fetchAll()
     } catch (err) {
-      setError('Failed to add expense')
+      setError(err.response?.data?.error || 'Failed to add expense')
     } finally {
       setAdding(false)
     }
@@ -67,11 +101,18 @@ export default function GroupDetail() {
 
   const addMember = async (e) => {
     e.preventDefault()
+    const email = newMemberEmail.trim()
+    if (!email) return
+
     setAddingMember(true)
+    setError('')
+    setNotice('')
+
     try {
-      await api.post(`/groups/${id}/members`, { email: newMemberEmail })
+      await api.post(`/groups/${id}/members`, { email })
       setNewMemberEmail('')
-      fetchAll()
+      setNotice('Member added')
+      await fetchAll()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to add member')
     } finally {
@@ -79,215 +120,158 @@ export default function GroupDetail() {
     }
   }
 
-  if (loading) return <div style={styles.loading}>Loading...</div>
+  if (loading) {
+    return (
+      <main className="app-shell">
+        <p className="empty-state" aria-live="polite">Loading group...</p>
+      </main>
+    )
+  }
 
   return (
-    <div style={styles.container}>
-      {/* Navbar */}
-      <div style={styles.navbar}>
-        <button style={styles.backBtn} onClick={() => navigate('/dashboard')}>
-          ← Back
+    <main className="app-shell">
+      <header className="topbar">
+        <button className="button button-secondary" onClick={() => navigate('/dashboard')}>
+          Back
         </button>
-        <h1 style={styles.logo}>💰 {group?.name}</h1>
-        <div style={{ width: 80 }} />
-      </div>
+        <div className="topbar-title">
+          <p className="brand-mark">Splitwise</p>
+          <h1>{group?.name || 'Group'}</h1>
+        </div>
+        <div className="stat-pill">
+          <span>Total spent</span>
+          <strong>{formatCurrency(totalSpent)}</strong>
+        </div>
+      </header>
 
-      <div style={styles.content}>
-        {error && <p style={styles.error}>{error}</p>}
+      <section className="content-grid group-grid">
+        <div className="panel" aria-labelledby="balances-title">
+          <h2 id="balances-title">Balances</h2>
+          <p className="muted">Positive means the member should receive money. Negative means they owe.</p>
 
-        {/* Balances */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>💳 Balances</h2>
-          {Object.keys(balances).length === 0 ? (
-            <p style={styles.muted}>No expenses yet</p>
+          {error && <p className="alert alert-error" role="alert">{error}</p>}
+          {notice && <p className="alert alert-success" role="status">{notice}</p>}
+
+          {members.length === 0 ? (
+            <p className="empty-state">No members found.</p>
           ) : (
-            members.map(member => {
-              const balance = balances[member.id] || 0
-              const isPositive = balance > 0
-              const isZero = balance === 0
-              return (
-                <div key={member.id} style={styles.balanceRow}>
-                  <span style={styles.memberName}>
-                    {member.name} {member.id === user.id ? '(you)' : ''}
-                  </span>
-                  <span style={{
-                    ...styles.balanceAmount,
-                    color: isZero ? '#888' : isPositive ? '#1cc29f' : '#e74c3c'
-                  }}>
-                    {isPositive ? '+' : ''}RM{balance.toFixed(2)}
-                  </span>
-                </div>
-              )
-            })
+            <div className="list">
+              {members.map(member => {
+                const balance = Number(balances[member.id] || 0)
+                const balanceClass = balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'
+
+                return (
+                  <div key={member.id} className="list-row">
+                    <span className="avatar" aria-hidden="true">{member.name.slice(0, 1).toUpperCase()}</span>
+                    <span>
+                      <span className="row-title">
+                        {member.name}{member.id === user.id ? ' (you)' : ''}
+                      </span>
+                      <span className="row-meta">{member.email}</span>
+                    </span>
+                    <strong className={`money ${balanceClass}`}>{formatCurrency(balance)}</strong>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
-        {/* Add Expense */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>➕ Add Expense</h2>
-          <p style={styles.muted} >Split equally among all {members.length} members</p>
-          <form onSubmit={addExpense} style={styles.expenseForm}>
-            <input
-              style={styles.input}
-              type="text"
-              placeholder="Description (e.g. Dinner)"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              required
-            />
-            <input
-              style={styles.input}
-              type="number"
-              placeholder="Amount (RM)"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              min="0"
-              step="0.01"
-              required
-            />
-            <button style={styles.button} disabled={adding}>
-              {adding ? 'Adding...' : 'Add Expense'}
+        <div className="panel" aria-labelledby="expense-title">
+          <h2 id="expense-title">Add Expense</h2>
+          <p className="muted">Expenses are split equally across all current members.</p>
+
+          <form onSubmit={addExpense} className="stack">
+            <div className="field">
+              <label htmlFor="expense-description">Description</label>
+              <input
+                id="expense-description"
+                type="text"
+                placeholder="Dinner"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="expense-amount">Amount</label>
+              <input
+                id="expense-amount"
+                type="number"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                min="0.01"
+                step="0.01"
+                required
+              />
+            </div>
+
+            <button className="button button-primary" disabled={adding || members.length === 0}>
+              {adding ? 'Adding...' : 'Add expense'}
             </button>
           </form>
         </div>
 
-        {/* Add Member */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>👥 Members</h2>
-          <div style={styles.membersList}>
+        <div className="panel" aria-labelledby="members-title">
+          <h2 id="members-title">Members</h2>
+
+          <div className="chip-list" aria-label="Group members">
             {members.map(member => (
-              <div key={member.id} style={styles.memberChip}>
-                {member.name} {member.id === user.id ? '(you)' : ''}
-              </div>
+              <span key={member.id} className="chip">
+                {member.name}{member.id === user.id ? ' (you)' : ''}
+              </span>
             ))}
           </div>
-          <form onSubmit={addMember} style={styles.form}>
-            <input
-              style={styles.input}
-              type="email"
-              placeholder="Add member by email"
-              value={newMemberEmail}
-              onChange={e => setNewMemberEmail(e.target.value)}
-              required
-            />
-            <button style={styles.button} disabled={addingMember}>
+
+          <form onSubmit={addMember} className="inline-form">
+            <div className="field">
+              <label htmlFor="member-email">Add member by email</label>
+              <input
+                id="member-email"
+                type="email"
+                placeholder="friend@example.com"
+                value={newMemberEmail}
+                onChange={e => setNewMemberEmail(e.target.value)}
+                required
+              />
+            </div>
+            <button className="button button-primary" disabled={addingMember || !newMemberEmail.trim()}>
               {addingMember ? 'Adding...' : 'Add'}
             </button>
           </form>
         </div>
 
-        {/* Expenses List */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>🧾 Expenses</h2>
+        <div className="panel panel-wide" aria-labelledby="expenses-title">
+          <div className="section-heading">
+            <div>
+              <h2 id="expenses-title">Expenses</h2>
+              <p className="muted">{expenses.length} recorded expense{expenses.length === 1 ? '' : 's'}</p>
+            </div>
+          </div>
+
           {expenses.length === 0 ? (
-            <p style={styles.muted}>No expenses yet</p>
+            <p className="empty-state">No expenses yet. Add the first shared cost above.</p>
           ) : (
-            expenses.map(expense => (
-              <div key={expense.id} style={styles.expenseCard}>
-                <div style={styles.expenseIcon}>🍽️</div>
-                <div style={styles.expenseInfo}>
-                  <div style={styles.expenseDesc}>{expense.description}</div>
-                  <div style={styles.expenseMeta}>
-                    Paid by {expense.paidBy.name} •{' '}
-                    {new Date(expense.createdAt).toLocaleDateString()}
-                  </div>
+            <div className="list">
+              {expenses.map(expense => (
+                <div key={expense.id} className="list-row expense-row">
+                  <span className="avatar avatar-muted" aria-hidden="true">RM</span>
+                  <span>
+                    <span className="row-title">{expense.description}</span>
+                    <span className="row-meta">
+                      Paid by {expense.paidBy.name} on {new Date(expense.createdAt).toLocaleDateString()}
+                    </span>
+                  </span>
+                  <strong className="money neutral">{formatCurrency(expense.amount)}</strong>
                 </div>
-                <div style={styles.expenseAmount}>
-                  RM{expense.amount.toFixed(2)}
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
-}
-
-const styles = {
-  container: { minHeight: '100vh', background: '#f5f5f5' },
-  loading: { padding: '40px', textAlign: 'center', color: '#888' },
-  navbar: {
-    background: 'white',
-    padding: '16px 24px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-  },
-  logo: { color: '#1cc29f', fontSize: '20px' },
-  backBtn: {
-    background: 'transparent',
-    border: 'none',
-    fontSize: '14px',
-    color: '#666',
-    width: 80
-  },
-  content: { maxWidth: '600px', margin: '32px auto', padding: '0 16px' },
-  card: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-  },
-  cardTitle: { fontSize: '18px', marginBottom: '16px', color: '#333' },
-  balanceRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 0',
-    borderBottom: '1px solid #f0f0f0'
-  },
-  memberName: { fontSize: '15px', color: '#333' },
-  balanceAmount: { fontWeight: '700', fontSize: '16px' },
-  expenseForm: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  form: { display: 'flex', gap: '10px', marginTop: '12px' },
-  input: {
-    flex: 1,
-    padding: '10px 14px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px'
-  },
-  button: {
-    padding: '10px 18px',
-    background: '#1cc29f',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    whiteSpace: 'nowrap'
-  },
-  membersList: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' },
-  memberChip: {
-    padding: '6px 12px',
-    background: '#f0fdf9',
-    border: '1px solid #1cc29f',
-    borderRadius: '100px',
-    fontSize: '13px',
-    color: '#1cc29f'
-  },
-  expenseCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '12px 0',
-    borderBottom: '1px solid #f0f0f0'
-  },
-  expenseIcon: { fontSize: '24px' },
-  expenseInfo: { flex: 1 },
-  expenseDesc: { fontWeight: '600', fontSize: '15px' },
-  expenseMeta: { fontSize: '12px', color: '#888', marginTop: '2px' },
-  expenseAmount: { fontWeight: '700', fontSize: '16px', color: '#333' },
-  error: {
-    color: '#e74c3c',
-    background: '#fdf0ed',
-    padding: '10px',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    fontSize: '14px'
-  },
-  muted: { color: '#888', fontSize: '14px', marginBottom: '12px' }
 }
