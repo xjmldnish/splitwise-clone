@@ -28,9 +28,10 @@ export default function Register() {
   return (
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="register-title">
+        <span className="brand-icon" aria-hidden="true">S</span>
         <p className="brand-mark">Splitwise</p>
         <h1 id="register-title">Create an account</h1>
-        <p className="auth-copy">Start a group, add friends, and keep balances clear.</p>
+        <p className="auth-copy">Start a group, invite people, and make shared spending easy to understand from day one.</p>
 
         {error && <p className="alert alert-error" role="alert">{error}</p>}
 
@@ -40,6 +41,7 @@ export default function Register() {
             <input
               id="name"
               type="text"
+              placeholder="Ajmal Danish"
               autoComplete="name"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -52,6 +54,7 @@ export default function Register() {
             <input
               id="email"
               type="email"
+              placeholder="you@example.com"
               autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -64,6 +67,7 @@ export default function Register() {
             <input
               id="password"
               type="password"
+              placeholder="At least 8 characters"
               autoComplete="new-password"
               minLength="8"
               value={password}

@@ -23,6 +23,8 @@ router.post('/:groupId', async (req, res) => {
     const groupId = parseGroupId(req.params.groupId)
     const description = req.body.description?.trim()
     const amount = Number(req.body.amount)
+    const category = req.body.category?.trim() || 'General'
+    const paidById = Number(req.body.paidById) || req.userId
     const splitWith = req.body.splitWith
 
     if (!groupId) return res.status(400).json({ error: 'Invalid group id' })
@@ -44,7 +46,10 @@ router.post('/:groupId', async (req, res) => {
     const memberIds = new Set(groupMembers.map(member => member.userId))
     const uniqueSplitWith = [...new Set(splitWith.map(userId => Number(userId)))]
 
-    if (!uniqueSplitWith.includes(req.userId)) uniqueSplitWith.push(req.userId)
+    if (!memberIds.has(paidById)) {
+      return res.status(400).json({ error: 'The payer must be a group member' })
+    }
+    if (!uniqueSplitWith.includes(paidById)) uniqueSplitWith.push(paidById)
     if (uniqueSplitWith.some(userId => !memberIds.has(userId))) {
       return res.status(400).json({ error: 'Expenses can only be split with group members' })
     }
@@ -54,7 +59,8 @@ router.post('/:groupId', async (req, res) => {
       data: {
         description,
         amount,
-        paidById: req.userId,
+        category,
+        paidById,
         groupId,
         splits: {
           create: uniqueSplitWith.map(userId => ({

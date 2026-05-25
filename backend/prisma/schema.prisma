@@ -43,6 +43,7 @@ model Expense {
   id          Int      @id @default(autoincrement())
   description String
   amount      Float
+  category    String   @default("General")
   paidById    Int
   groupId     Int
   createdAt   DateTime @default(now())

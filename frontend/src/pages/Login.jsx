@@ -30,9 +30,10 @@ export default function Login() {
   return (
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="login-title">
+        <span className="brand-icon" aria-hidden="true">S</span>
         <p className="brand-mark">Splitwise</p>
         <h1 id="login-title">Welcome back</h1>
-        <p className="auth-copy">Log in to manage shared expenses and balances.</p>
+        <p className="auth-copy">Pick up exactly where your group left off: expenses, balances, and who should pay whom.</p>
 
         {error && <p className="alert alert-error" role="alert">{error}</p>}
 
@@ -42,6 +43,7 @@ export default function Login() {
             <input
               id="email"
               type="email"
+              placeholder="you@example.com"
               autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -54,6 +56,7 @@ export default function Login() {
             <input
               id="password"
               type="password"
+              placeholder="Your password"
               autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -62,7 +65,7 @@ export default function Login() {
           </div>
 
           <button className="button button-primary" disabled={loading}>
-            {loading ? 'Logging in...' : 'Log in'}
+            {loading ? 'Logging in...' : 'Log in securely'}
           </button>
         </form>
 

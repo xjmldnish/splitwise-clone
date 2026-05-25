@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 
+const getInitials = (name = '') => {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase() || '?'
+}
+
 export default function Dashboard() {
   const [groups, setGroups] = useState([])
   const [newGroupName, setNewGroupName] = useState('')
@@ -59,76 +69,146 @@ export default function Dashboard() {
     }
   }
 
+  const totalMembers = groups.reduce((sum, group) => sum + group.members.length, 0)
+
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="brand-mark">Splitwise</p>
-          <h1>Groups</h1>
+    <main className="app-shell dashboard-shell">
+      <header className="app-header">
+        <div className="app-brand" aria-label="Splitwise dashboard">
+          <span className="brand-icon" aria-hidden="true">S</span>
+          <div>
+            <p className="brand-mark">Splitwise</p>
+            <h1>Shared money, made calm.</h1>
+          </div>
         </div>
         <div className="topbar-actions">
-          <span className="welcome-text">Hi, {user?.name}</span>
+          <span className="user-badge" aria-label={`Signed in as ${user?.name}`}>
+            <span className="avatar avatar-small" aria-hidden="true">{getInitials(user?.name)}</span>
+            <span>{user?.name}</span>
+          </span>
           <button className="button button-secondary" onClick={handleLogout}>Log out</button>
         </div>
       </header>
 
-      <section className="content-grid dashboard-grid">
-        <div className="panel" aria-labelledby="create-group-title">
-          <h2 id="create-group-title">Create a Group</h2>
-          <p className="muted">Use a clear name so members recognize what the expenses are for.</p>
+      <section className="workspace">
+        <aside className="sidebar" aria-label="Primary navigation">
+          <a className="nav-item active" href="#groups">
+            <span aria-hidden="true">⌂</span>
+            Groups
+          </a>
+          <a className="nav-item" href="#new-group">
+            <span aria-hidden="true">＋</span>
+            New group
+          </a>
+          <a className="nav-item" href="#activity">
+            <span aria-hidden="true">◎</span>
+            Overview
+          </a>
+        </aside>
 
-          {error && <p className="alert alert-error" role="alert">{error}</p>}
-
-          <form onSubmit={createGroup} className="inline-form">
-            <div className="field">
-              <label htmlFor="group-name">Group name</label>
-              <input
-                id="group-name"
-                type="text"
-                placeholder="Trip to Langkawi"
-                value={newGroupName}
-                onChange={e => setNewGroupName(e.target.value)}
-                required
-              />
-            </div>
-            <button className="button button-primary" disabled={creating || !newGroupName.trim()}>
-              {creating ? 'Creating...' : 'Create'}
-            </button>
-          </form>
-        </div>
-
-        <div className="panel" aria-labelledby="groups-title">
-          <div className="section-heading">
+        <div className="workspace-main">
+          <section className="hero-panel" aria-labelledby="dashboard-title">
             <div>
-              <h2 id="groups-title">Your Groups</h2>
-              <p className="muted">{groups.length} active group{groups.length === 1 ? '' : 's'}</p>
+              <p className="eyebrow">Dashboard</p>
+              <h2 id="dashboard-title">Hi {user?.name?.split(' ')[0] || 'there'}, where are we splitting today?</h2>
+              <p className="hero-copy">Create a group, add people, and let the app turn messy receipts into clear next steps.</p>
             </div>
-          </div>
+            <div className="metric-strip" aria-label="Dashboard summary">
+              <div className="metric-card">
+                <span>Active groups</span>
+                <strong>{groups.length}</strong>
+              </div>
+              <div className="metric-card">
+                <span>People tracked</span>
+                <strong>{totalMembers}</strong>
+              </div>
+            </div>
+          </section>
 
-          {loading ? (
-            <p className="empty-state" aria-live="polite">Loading groups...</p>
-          ) : groups.length === 0 ? (
-            <p className="empty-state">No groups yet. Create one to start tracking shared expenses.</p>
-          ) : (
-            <div className="list" aria-label="Groups">
-              {groups.map(group => (
-                <button
-                  key={group.id}
-                  className="list-row group-row"
-                  onClick={() => navigate(`/groups/${group.id}`)}
-                >
-                  <span className="avatar" aria-hidden="true">{group.name.slice(0, 1).toUpperCase()}</span>
-                  <span>
-                    <span className="row-title">{group.name}</span>
-                    <span className="row-meta">
-                      {group.members.length} member{group.members.length === 1 ? '' : 's'}
-                    </span>
-                  </span>
-                  <span className="row-action" aria-hidden="true">Open</span>
+          <section className="content-grid dashboard-grid">
+            <div className="panel action-panel" id="new-group" aria-labelledby="create-group-title">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Quick start</p>
+                  <h2 id="create-group-title">Create a group</h2>
+                </div>
+                <span className="panel-icon" aria-hidden="true">＋</span>
+              </div>
+              <p className="muted">Use a name people instantly recognize, like “Melaka weekend” or “Housemates May”.</p>
+
+              {error && <div className="toast toast-error" role="alert">{error}</div>}
+
+              <form onSubmit={createGroup} className="stack">
+                <div className="field">
+                  <label htmlFor="group-name">Group name</label>
+                  <input
+                    id="group-name"
+                    type="text"
+                    placeholder="Trip to Langkawi"
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
+                    aria-describedby="group-name-hint"
+                    required
+                  />
+                  <span id="group-name-hint" className="field-hint">You can add members after creating the group.</span>
+                </div>
+                <button className="button button-primary button-full" disabled={creating || !newGroupName.trim()}>
+                  {creating ? 'Creating group...' : 'Create group'}
                 </button>
-              ))}
+              </form>
             </div>
-          )}
+
+            <div className="panel" id="groups" aria-labelledby="groups-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Open groups</p>
+                  <h2 id="groups-title">Your groups</h2>
+                  <p className="muted">{groups.length} active group{groups.length === 1 ? '' : 's'}</p>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="skeleton-list" aria-live="polite" aria-label="Loading groups">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ) : groups.length === 0 ? (
+                <div className="empty-state empty-state-rich">
+                  <span className="empty-icon" aria-hidden="true">＋</span>
+                  <h3>Create your first group to start tracking shared expenses.</h3>
+                  <p>Groups keep members, expenses, and balances together so everyone knows what happens next.</p>
+                </div>
+              ) : (
+                <div className="list" aria-label="Groups">
+                  {groups.map(group => (
+                    <button
+                      key={group.id}
+                      className="list-row group-row"
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                    >
+                      <span className="avatar" aria-hidden="true">{getInitials(group.name)}</span>
+                      <span className="row-body">
+                        <span className="row-title">{group.name}</span>
+                        <span className="row-meta">
+                          {group.members.length} member{group.members.length === 1 ? '' : 's'} ready to split expenses
+                        </span>
+                      </span>
+                      <span className="row-action" aria-hidden="true">Open</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="panel panel-wide insight-panel" id="activity" aria-labelledby="next-title">
+              <div>
+                <p className="eyebrow">Suggested next step</p>
+                <h2 id="next-title">Keep every group close to a settlement.</h2>
+                <p className="muted">After adding expenses, review the settlement suggestions first. This makes the most important action obvious and reduces mental math for everyone.</p>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     </main>
