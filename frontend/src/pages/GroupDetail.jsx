@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import Toast from '../components/Toast'
+import ConfirmModal from '../components/ConfirmModal'
 
 const expenseCategories = ['Food', 'Travel', 'Home', 'Shopping', 'Bills', 'General']
 
@@ -100,6 +102,9 @@ export default function GroupDetail() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formTouched, setFormTouched] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [copiedSettlementId, setCopiedSettlementId] = useState(null)
 
   const fetchAll = useCallback(async ({ showLoading = false } = {}) => {
     if (showLoading) setLoading(true)
@@ -142,6 +147,11 @@ export default function GroupDetail() {
   const totalSpent = useMemo(() => {
     return expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
   }, [expenses])
+
+  const filteredExpenses = useMemo(() => {
+    if (categoryFilter === 'All') return expenses
+    return expenses.filter(expense => (expense.category || 'General') === categoryFilter)
+  }, [expenses, categoryFilter])
 
   const selectedSplitMembers = useMemo(() => {
     const selected = new Set(splitWith)
@@ -241,11 +251,6 @@ export default function GroupDetail() {
   const deleteGroup = async (e) => {
     e.preventDefault()
 
-    if (deleteGroupText !== group?.name) {
-      setError(`Type ${group?.name} to confirm group deletion.`)
-      return
-    }
-
     setDeletingGroup(true)
     setError('')
     setNotice('')
@@ -257,6 +262,18 @@ export default function GroupDetail() {
       setError(err.response?.data?.error || 'Unable to delete this group')
     } finally {
       setDeletingGroup(false)
+      setShowDeleteModal(false)
+    }
+  }
+
+  const copySettlementToClipboard = async (suggestion) => {
+    const text = `${suggestion.from.name} should pay ${suggestion.to.name} ${formatCurrency(suggestion.amount)}`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedSettlementId(suggestion.id)
+      setTimeout(() => setCopiedSettlementId(null), 2000)
+    } catch {
+      setError('Failed to copy to clipboard')
     }
   }
 
@@ -273,6 +290,19 @@ export default function GroupDetail() {
 
   return (
     <main className="app-shell">
+      {error && <Toast message={error} type="error" onDismiss={() => setError('')} />}
+      {notice && <Toast message={notice} type="success" onDismiss={() => setNotice('')} />}
+      {showDeleteModal && (
+        <ConfirmModal
+          title="Delete this group?"
+          message={`This will permanently delete "${group?.name}" and remove all expenses and settlement history. This action cannot be undone.`}
+          confirmText="Delete group"
+          cancelText="Cancel"
+          isDangerous
+          onConfirm={deleteGroup}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
       <header className="app-header group-header">
         <div className="header-left">
           <button className="button button-icon" onClick={() => navigate('/dashboard')} aria-label="Back to dashboard">
@@ -368,7 +398,17 @@ export default function GroupDetail() {
                       <span>
                         <strong>{suggestion.from.name}</strong> should pay <strong>{suggestion.to.name}</strong>
                       </span>
-                      <strong>{formatCurrency(suggestion.amount)}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <strong>{formatCurrency(suggestion.amount)}</strong>
+                        <button
+                          type="button"
+                          className={`button button-copy ${copiedSettlementId === suggestion.id ? 'copied' : ''}`}
+                          onClick={() => copySettlementToClipboard(suggestion)}
+                          title="Copy to clipboard"
+                        >
+                          {copiedSettlementId === suggestion.id ? '✓ Copied' : 'Copy'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -544,21 +584,14 @@ export default function GroupDetail() {
                 category history, and settlement suggestions.
               </p>
 
-              <form onSubmit={deleteGroup} className="danger-form">
-                <div className="field">
-                  <label htmlFor="delete-group-confirm">Type {group?.name || 'the group name'} to confirm</label>
-                  <input
-                    id="delete-group-confirm"
-                    type="text"
-                    value={deleteGroupText}
-                    onChange={e => setDeleteGroupText(e.target.value)}
-                    required
-                  />
-                </div>
-
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                setShowDeleteModal(true)
+              }} className="danger-form">
                 <button
+                  type="button"
                   className="button button-danger"
-                  disabled={deletingGroup || deleteGroupText !== group?.name}
+                  disabled={deletingGroup}
                 >
                   {deletingGroup ? 'Deleting group...' : 'Delete group permanently'}
                 </button>
@@ -570,18 +603,37 @@ export default function GroupDetail() {
                 <div>
                   <p className="eyebrow">Activity timeline</p>
                   <h2 id="expenses-title">Expense history</h2>
-                  <p className="muted">{expenses.length} recorded expense{expenses.length === 1 ? '' : 's'}</p>
+                  <p className="muted">{filteredExpenses.length} of {expenses.length} expense{expenses.length === 1 ? '' : 's'}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setCategoryFilter('All')}
+                    className={`button ${categoryFilter === 'All' ? 'button-primary' : 'button-secondary'}`}
+                    style={{ minHeight: '40px', padding: '8px 12px', fontSize: '13px' }}
+                  >
+                    All
+                  </button>
+                  {expenseCategories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`button ${categoryFilter === cat ? 'button-primary' : 'button-secondary'}`}
+                      style={{ minHeight: '40px', padding: '8px 12px', fontSize: '13px' }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {expenses.length === 0 ? (
+              {filteredExpenses.length === 0 ? (
                 <div className="empty-state empty-state-rich">
-                  <h3>No expenses yet. Add your first expense.</h3>
+                  <h3>{categoryFilter === 'All' ? 'No expenses yet.' : `No ${categoryFilter} expenses yet.`}</h3>
                   <p>Start with the latest receipt. The app will calculate balances and payment suggestions automatically.</p>
                 </div>
               ) : (
                 <div className="timeline-list">
-                  {expenses.map(expense => (
+                  {filteredExpenses.map(expense => (
                     <article key={expense.id} className="timeline-item">
                       <span className="avatar avatar-muted" aria-hidden="true">{(expense.category || 'General').slice(0, 2).toUpperCase()}</span>
                       <div>

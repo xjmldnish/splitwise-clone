@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import Toast from '../components/Toast'
+import ConfirmModal from '../components/ConfirmModal'
 
 const getInitials = (name = '') => {
   return name
@@ -23,6 +25,7 @@ export default function Dashboard() {
   const [accountConfirmText, setAccountConfirmText] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -94,6 +97,7 @@ export default function Dashboard() {
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to delete your account')
     } finally {
+      setShowDeleteModal(false)
       setDeletingAccount(false)
     }
   }
@@ -101,6 +105,19 @@ export default function Dashboard() {
   const totalMembers = groups.reduce((sum, group) => sum + group.members.length, 0)
 
   return (
+      {error && <Toast message={error} type="error" onDismiss={() => setError('')} />}
+      {notice && <Toast message={notice} type="success" onDismiss={() => setNotice('')} />}
+      {showDeleteModal && (
+        <ConfirmModal
+          title="Delete your account?"
+          message="This action cannot be undone. All your data will be permanently deleted."
+          confirmText="Delete my account"
+          cancelText="Cancel"
+          isDangerous
+          onConfirm={deleteAccount}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
     <main className="app-shell dashboard-shell">
       <header className="app-header">
         <div className="app-brand" aria-label="Splitwise dashboard">
@@ -164,9 +181,6 @@ export default function Dashboard() {
                 <span className="panel-icon" aria-hidden="true">+</span>
               </div>
               <p className="muted">Use a name people instantly recognize, like "Melaka weekend" or "Housemates May".</p>
-
-              {error && <div className="toast toast-error" role="alert">{error}</div>}
-              {notice && <div className="toast toast-success" role="status">{notice}</div>}
 
               <form onSubmit={createGroup} className="stack">
                 <div className="field">
@@ -243,7 +257,14 @@ export default function Dashboard() {
                 expenses, balances, and settlement suggestions.
               </p>
 
-              <form onSubmit={deleteAccount} className="danger-form">
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                if (!accountPassword) {
+                  setError('Please enter your password to confirm.')
+                  return
+                }
+                setShowDeleteModal(true)
+              }} className="danger-form">
                 <div className="field">
                   <label htmlFor="delete-account-password">Confirm password</label>
                   <input
@@ -256,20 +277,9 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="field">
-                  <label htmlFor="delete-account-confirm">Type DELETE MY ACCOUNT</label>
-                  <input
-                    id="delete-account-confirm"
-                    type="text"
-                    value={accountConfirmText}
-                    onChange={e => setAccountConfirmText(e.target.value)}
-                    required
-                  />
-                </div>
-
                 <button
                   className="button button-danger"
-                  disabled={deletingAccount || !accountPassword || accountConfirmText !== 'DELETE MY ACCOUNT'}
+                  disabled={deletingAccount || !accountPassword}
                 >
                   {deletingAccount ? 'Deleting account...' : 'Delete account permanently'}
                 </button>
