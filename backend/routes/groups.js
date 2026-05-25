@@ -89,4 +89,39 @@ router.post('/:groupId/members', async (req, res) => {
   }
 })
 
+router.delete('/:groupId', async (req, res) => {
+  try {
+    const groupId = parseGroupId(req.params.groupId)
+
+    if (!groupId) return res.status(400).json({ error: 'Invalid group id' })
+
+    const membership = await getMembership(groupId, req.userId)
+    if (!membership) return res.status(403).json({ error: 'You do not have access to this group' })
+
+    await prisma.$transaction(async (tx) => {
+      const expenses = await tx.expense.findMany({
+        where: { groupId },
+        select: { id: true }
+      })
+      const expenseIds = expenses.map(expense => expense.id)
+
+      if (expenseIds.length > 0) {
+        await tx.expenseSplit.deleteMany({
+          where: { expenseId: { in: expenseIds } }
+        })
+      }
+
+      await tx.settlement.deleteMany({ where: { groupId } })
+      await tx.expense.deleteMany({ where: { groupId } })
+      await tx.groupMember.deleteMany({ where: { groupId } })
+      await tx.group.delete({ where: { id: groupId } })
+    })
+
+    res.json({ message: 'Group deleted' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong' })
+  }
+})
+
 module.exports = router

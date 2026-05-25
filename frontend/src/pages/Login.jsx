@@ -69,7 +69,11 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="auth-switch">
+        <p className="auth-helper">
+          <Link to="/forgot">Forgot username or password?</Link>
+        </p>
+
+        <p className="auth-switch auth-switch-compact">
           New here? <Link to="/register">Create an account</Link>
         </p>
       </section>

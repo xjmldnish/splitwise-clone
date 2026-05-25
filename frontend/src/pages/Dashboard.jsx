@@ -18,7 +18,11 @@ export default function Dashboard() {
   const [newGroupName, setNewGroupName] = useState('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [accountConfirmText, setAccountConfirmText] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -57,15 +61,40 @@ export default function Dashboard() {
 
     setCreating(true)
     setError('')
+    setNotice('')
 
     try {
       const res = await api.post('/groups', { name })
       setGroups(current => [res.data, ...current])
       setNewGroupName('')
+      setNotice('Group created. Add members and expenses when you are ready.')
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to create this group')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const deleteAccount = async (e) => {
+    e.preventDefault()
+
+    if (accountConfirmText !== 'DELETE MY ACCOUNT') {
+      setError('Type DELETE MY ACCOUNT to confirm account deletion.')
+      return
+    }
+
+    setDeletingAccount(true)
+    setError('')
+    setNotice('')
+
+    try {
+      await api.delete('/auth/me', { data: { password: accountPassword } })
+      logout()
+      navigate('/login')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to delete your account')
+    } finally {
+      setDeletingAccount(false)
     }
   }
 
@@ -93,16 +122,16 @@ export default function Dashboard() {
       <section className="workspace">
         <aside className="sidebar" aria-label="Primary navigation">
           <a className="nav-item active" href="#groups">
-            <span aria-hidden="true">⌂</span>
+            <span aria-hidden="true">#</span>
             Groups
           </a>
           <a className="nav-item" href="#new-group">
-            <span aria-hidden="true">＋</span>
+            <span aria-hidden="true">+</span>
             New group
           </a>
-          <a className="nav-item" href="#activity">
-            <span aria-hidden="true">◎</span>
-            Overview
+          <a className="nav-item" href="#account">
+            <span aria-hidden="true">!</span>
+            Account
           </a>
         </aside>
 
@@ -132,11 +161,12 @@ export default function Dashboard() {
                   <p className="eyebrow">Quick start</p>
                   <h2 id="create-group-title">Create a group</h2>
                 </div>
-                <span className="panel-icon" aria-hidden="true">＋</span>
+                <span className="panel-icon" aria-hidden="true">+</span>
               </div>
-              <p className="muted">Use a name people instantly recognize, like “Melaka weekend” or “Housemates May”.</p>
+              <p className="muted">Use a name people instantly recognize, like "Melaka weekend" or "Housemates May".</p>
 
               {error && <div className="toast toast-error" role="alert">{error}</div>}
+              {notice && <div className="toast toast-success" role="status">{notice}</div>}
 
               <form onSubmit={createGroup} className="stack">
                 <div className="field">
@@ -175,7 +205,7 @@ export default function Dashboard() {
                 </div>
               ) : groups.length === 0 ? (
                 <div className="empty-state empty-state-rich">
-                  <span className="empty-icon" aria-hidden="true">＋</span>
+                  <span className="empty-icon" aria-hidden="true">+</span>
                   <h3>Create your first group to start tracking shared expenses.</h3>
                   <p>Groups keep members, expenses, and balances together so everyone knows what happens next.</p>
                 </div>
@@ -201,12 +231,49 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="panel panel-wide insight-panel" id="activity" aria-labelledby="next-title">
-              <div>
-                <p className="eyebrow">Suggested next step</p>
-                <h2 id="next-title">Keep every group close to a settlement.</h2>
-                <p className="muted">After adding expenses, review the settlement suggestions first. This makes the most important action obvious and reduces mental math for everyone.</p>
+            <div className="panel danger-zone panel-wide" id="account" aria-labelledby="account-danger-title">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Account controls</p>
+                  <h2 id="account-danger-title">Delete account</h2>
+                </div>
               </div>
+              <p className="muted">
+                This permanently deletes your account and removes the groups you belong to, including their members,
+                expenses, balances, and settlement suggestions.
+              </p>
+
+              <form onSubmit={deleteAccount} className="danger-form">
+                <div className="field">
+                  <label htmlFor="delete-account-password">Confirm password</label>
+                  <input
+                    id="delete-account-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={accountPassword}
+                    onChange={e => setAccountPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="delete-account-confirm">Type DELETE MY ACCOUNT</label>
+                  <input
+                    id="delete-account-confirm"
+                    type="text"
+                    value={accountConfirmText}
+                    onChange={e => setAccountConfirmText(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <button
+                  className="button button-danger"
+                  disabled={deletingAccount || !accountPassword || accountConfirmText !== 'DELETE MY ACCOUNT'}
+                >
+                  {deletingAccount ? 'Deleting account...' : 'Delete account permanently'}
+                </button>
+              </form>
             </div>
           </section>
         </div>

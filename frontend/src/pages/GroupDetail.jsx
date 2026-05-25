@@ -95,6 +95,8 @@ export default function GroupDetail() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [addingMember, setAddingMember] = useState(false)
+  const [deletingGroup, setDeletingGroup] = useState(false)
+  const [deleteGroupText, setDeleteGroupText] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formTouched, setFormTouched] = useState(false)
@@ -234,6 +236,28 @@ export default function GroupDetail() {
       if (current.includes(memberId)) return current.filter(idValue => idValue !== memberId)
       return [...current, memberId]
     })
+  }
+
+  const deleteGroup = async (e) => {
+    e.preventDefault()
+
+    if (deleteGroupText !== group?.name) {
+      setError(`Type ${group?.name} to confirm group deletion.`)
+      return
+    }
+
+    setDeletingGroup(true)
+    setError('')
+    setNotice('')
+
+    try {
+      await api.delete(`/groups/${id}`)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to delete this group')
+    } finally {
+      setDeletingGroup(false)
+    }
   }
 
   if (loading) {
@@ -506,6 +530,39 @@ export default function GroupDetail() {
                   })}
                 </div>
               )}
+            </div>
+
+            <div className="panel danger-zone panel-wide" id="group-danger" aria-labelledby="group-danger-title">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Group controls</p>
+                  <h2 id="group-danger-title">Delete group</h2>
+                </div>
+              </div>
+              <p className="muted">
+                This permanently deletes {group?.name || 'this group'}, including all members, expenses, balances,
+                category history, and settlement suggestions.
+              </p>
+
+              <form onSubmit={deleteGroup} className="danger-form">
+                <div className="field">
+                  <label htmlFor="delete-group-confirm">Type {group?.name || 'the group name'} to confirm</label>
+                  <input
+                    id="delete-group-confirm"
+                    type="text"
+                    value={deleteGroupText}
+                    onChange={e => setDeleteGroupText(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <button
+                  className="button button-danger"
+                  disabled={deletingGroup || deleteGroupText !== group?.name}
+                >
+                  {deletingGroup ? 'Deleting group...' : 'Delete group permanently'}
+                </button>
+              </form>
             </div>
 
             <div className="panel panel-wide" id="timeline" aria-labelledby="expenses-title">
