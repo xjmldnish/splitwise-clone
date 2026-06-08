@@ -152,4 +152,33 @@ router.get('/:groupId/balances', async (req, res) => {
   }
 })
 
+router.delete('/:expenseId', async (req, res) => {
+  try {
+    const expenseId = Number.parseInt(req.params.expenseId, 10)
+    if (!Number.isInteger(expenseId) || expenseId <= 0) {
+      return res.status(400).json({ error: 'Invalid expense id' })
+    }
+
+    const expense = await prisma.expense.findUnique({
+      where: { id: expenseId },
+      select: { id: true, groupId: true }
+    })
+
+    if (!expense) return res.status(404).json({ error: 'Expense not found' })
+
+    const hasAccess = await requireGroupMembership(expense.groupId, req.userId)
+    if (!hasAccess) return res.status(403).json({ error: 'You do not have access to this group' })
+
+    await prisma.$transaction([
+      prisma.expenseSplit.deleteMany({ where: { expenseId } }),
+      prisma.expense.delete({ where: { id: expenseId } })
+    ])
+
+    res.status(204).end()
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong' })
+  }
+})
+
 module.exports = router

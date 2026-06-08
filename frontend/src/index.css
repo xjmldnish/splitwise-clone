@@ -755,8 +755,13 @@ h3 {
 
 .timeline-item {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr) 36px;
   gap: var(--space-3);
+  align-items: center;
+}
+
+.timeline-body {
+  min-width: 0;
 }
 
 .timeline-title {
@@ -1009,6 +1014,44 @@ h3 {
 }
 
 /* Copy to Clipboard Button */
+.button-sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.button-ghost-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  min-height: 36px;
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.button-ghost-danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  border-color: #ffd1cc;
+  color: var(--danger);
+  transform: none;
+}
+
+.filter-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settlement-amount {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .button-copy {
   padding: 6px 12px;
   font-size: 13px;
