@@ -7,6 +7,15 @@ import ConfirmModal from '../components/ConfirmModal'
 
 const expenseCategories = ['Food', 'Travel', 'Home', 'Shopping', 'Bills', 'General']
 
+const categoryEmoji = {
+  Food: '🍽',
+  Travel: '✈',
+  Home: '🏠',
+  Shopping: '🛍',
+  Bills: '📄',
+  General: '📌',
+}
+
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-MY', {
     style: 'currency',
@@ -99,6 +108,8 @@ export default function GroupDetail() {
   const [addingMember, setAddingMember] = useState(false)
   const [deletingGroup, setDeletingGroup] = useState(false)
   const [deleteGroupText, setDeleteGroupText] = useState('')
+  const [expenseToDelete, setExpenseToDelete] = useState(null)
+  const [deletingExpense, setDeletingExpense] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formTouched, setFormTouched] = useState(false)
@@ -248,9 +259,7 @@ export default function GroupDetail() {
     })
   }
 
-  const deleteGroup = async (e) => {
-    e.preventDefault()
-
+  const deleteGroup = async () => {
     setDeletingGroup(true)
     setError('')
     setNotice('')
@@ -263,6 +272,23 @@ export default function GroupDetail() {
     } finally {
       setDeletingGroup(false)
       setShowDeleteModal(false)
+    }
+  }
+
+  const deleteExpense = async () => {
+    if (!expenseToDelete) return
+    setDeletingExpense(true)
+    setError('')
+
+    try {
+      await api.delete(`/expenses/${expenseToDelete.id}`)
+      setNotice(`"${expenseToDelete.description}" removed. Balances updated.`)
+      setExpenseToDelete(null)
+      await fetchAll()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete expense')
+    } finally {
+      setDeletingExpense(false)
     }
   }
 
@@ -303,6 +329,17 @@ export default function GroupDetail() {
           onCancel={() => setShowDeleteModal(false)}
         />
       )}
+      {expenseToDelete && (
+        <ConfirmModal
+          title="Remove this expense?"
+          message={`"${expenseToDelete.description}" (${formatCurrency(expenseToDelete.amount)}) will be permanently deleted and balances will be recalculated.`}
+          confirmText={deletingExpense ? 'Removing...' : 'Remove expense'}
+          cancelText="Cancel"
+          isDangerous
+          onConfirm={deleteExpense}
+          onCancel={() => setExpenseToDelete(null)}
+        />
+      )}
       <header className="app-header group-header">
         <div className="header-left">
           <button className="button button-icon" onClick={() => navigate('/dashboard')} aria-label="Back to dashboard">
@@ -335,12 +372,6 @@ export default function GroupDetail() {
         </aside>
 
         <div className="workspace-main">
-          {(error || notice) && (
-            <div className={`toast ${error ? 'toast-error' : 'toast-success'}`} role={error ? 'alert' : 'status'}>
-              {error || notice}
-            </div>
-          )}
-
           <section className="content-grid group-grid">
             <div className="panel balance-panel" id="balances" aria-labelledby="balances-title">
               <div className="panel-heading">
@@ -398,7 +429,7 @@ export default function GroupDetail() {
                       <span>
                         <strong>{suggestion.from.name}</strong> should pay <strong>{suggestion.to.name}</strong>
                       </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <div className="settlement-amount">
                         <strong>{formatCurrency(suggestion.amount)}</strong>
                         <button
                           type="button"
@@ -560,7 +591,7 @@ export default function GroupDetail() {
                     const width = totalSpent ? Math.max((item.amount / totalSpent) * 100, 8) : 0
                     return (
                       <div key={item.name} className="category-row">
-                        <span>{item.name}</span>
+                        <span>{categoryEmoji[item.name]} {item.name}</span>
                         <div className="bar-track" aria-hidden="true">
                           <span style={{ width: `${width}%` }} />
                         </div>
@@ -605,11 +636,10 @@ export default function GroupDetail() {
                   <h2 id="expenses-title">Expense history</h2>
                   <p className="muted">{filteredExpenses.length} of {expenses.length} expense{expenses.length === 1 ? '' : 's'}</p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="filter-row">
                   <button
                     onClick={() => setCategoryFilter('All')}
-                    className={`button ${categoryFilter === 'All' ? 'button-primary' : 'button-secondary'}`}
-                    style={{ minHeight: '40px', padding: '8px 12px', fontSize: '13px' }}
+                    className={`button button-sm ${categoryFilter === 'All' ? 'button-primary' : 'button-secondary'}`}
                   >
                     All
                   </button>
@@ -617,10 +647,9 @@ export default function GroupDetail() {
                     <button
                       key={cat}
                       onClick={() => setCategoryFilter(cat)}
-                      className={`button ${categoryFilter === cat ? 'button-primary' : 'button-secondary'}`}
-                      style={{ minHeight: '40px', padding: '8px 12px', fontSize: '13px' }}
+                      className={`button button-sm ${categoryFilter === cat ? 'button-primary' : 'button-secondary'}`}
                     >
-                      {cat}
+                      {categoryEmoji[cat]} {cat}
                     </button>
                   ))}
                 </div>
@@ -635,16 +664,25 @@ export default function GroupDetail() {
                 <div className="timeline-list">
                   {filteredExpenses.map(expense => (
                     <article key={expense.id} className="timeline-item">
-                      <span className="avatar avatar-muted" aria-hidden="true">{(expense.category || 'General').slice(0, 2).toUpperCase()}</span>
-                      <div>
+                      <span className="avatar avatar-muted" aria-hidden="true">{categoryEmoji[expense.category || 'General'] || '📌'}</span>
+                      <div className="timeline-body">
                         <div className="timeline-title">
                           <h3>{expense.description}</h3>
                           <strong>{formatCurrency(expense.amount)}</strong>
                         </div>
                         <p>
-                          Paid by {expense.paidBy.name} · {expense.category || 'General'} · {new Date(expense.createdAt).toLocaleDateString()}
+                          Paid by {expense.paidBy.name} · {expense.category || 'General'} · {new Date(expense.createdAt).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        className="button button-icon button-ghost-danger"
+                        onClick={() => setExpenseToDelete(expense)}
+                        aria-label={`Delete expense: ${expense.description}`}
+                        title="Delete expense"
+                      >
+                        ✕
+                      </button>
                     </article>
                   ))}
                 </div>

@@ -78,9 +78,7 @@ export default function Dashboard() {
     }
   }
 
-  const deleteAccount = async (e) => {
-    e.preventDefault()
-
+  const deleteAccount = async () => {
     if (accountConfirmText !== 'DELETE MY ACCOUNT') {
       setError('Type DELETE MY ACCOUNT to confirm account deletion.')
       return
@@ -105,6 +103,7 @@ export default function Dashboard() {
   const totalMembers = groups.reduce((sum, group) => sum + group.members.length, 0)
 
   return (
+    <>
       {error && <Toast message={error} type="error" onDismiss={() => setError('')} />}
       {notice && <Toast message={notice} type="success" onDismiss={() => setNotice('')} />}
       {showDeleteModal && (
@@ -289,5 +288,6 @@ export default function Dashboard() {
         </div>
       </section>
     </main>
+    </>
   )
 }
